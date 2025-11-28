@@ -2,16 +2,30 @@ import express from "express";
 import { PrismaClient } from "@prisma/client";
 import cors from "cors";
 
+
 const prisma = new PrismaClient();
 const app = express();
 
-app.use(
-  cors({
-    origin: "http://localhost:5173", // origem permitida
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
-    credentials: true,
-  })
-);
+const allowedOrigins = process.env.CORS_ORIGINS
+  ? process.env.CORS_ORIGINS.split(",")
+  : ["http://localhost:5173"];
+
+const corsOptions = {
+  origin: (origin: string | undefined, callback: (error: Error | null, success: boolean) => void) => {
+    // Se a origem não for enviada (ex: ferramentas como Postman) OU se estiver na lista permitida
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      // Caso contrário, bloqueia
+      callback(new Error("Origin not allowed by CORS"), false);
+    }
+  },
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
+  credentials: true,
+};
+
+app.use(cors(corsOptions));
+app.use(express.json());
 
 app.use(express.json());
 
@@ -184,8 +198,8 @@ app.patch("/tasks/:task_id", async (req, res) => {
   }
 });
 
-// ------------------- SERVER -------------------
-const port = 3000;
+const port = process.env.PORT || 3000; // Usa a porta do Railway, ou 3000 como fallback local
+
 app.listen(port, () => {
   console.log(`Servidor iniciado na porta ${port}`);
 });
