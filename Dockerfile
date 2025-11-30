@@ -17,4 +17,5 @@ EXPOSE 3000
 
 # 2. RODA AS MIGRAÇÕES do Prisma E INICIA O SERVIDOR (Novo CMD crucial!)
 # Isso garante que a DATABASE_URL esteja disponível no ambiente de execução.
-CMD ["npm", "run", "railway:start"]
+# USANDO SINTAXE DE SHELL PARA GARANTIR ENCADEMANTO CORRETO:
+CMD sh -c "npx prisma migrate deploy && npm start"
