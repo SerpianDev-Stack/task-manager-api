@@ -20,23 +20,22 @@ console.log("🌎 Allowed Origins:", allowedOrigins);
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (!origin) return callback(null, true); // Postman, Mobile, etc
+      if (!origin) return callback(null, true);
 
-      const normalized = origin.replace(/\/$/, ""); // remove barra do origin real
+      const normalized = origin.replace(/\/$/, "");
 
       if (allowedOrigins.includes(normalized)) {
-        callback(null, true);
-      } else {
-        console.log("❌ CORS bloqueado para:", origin);
-        callback(new Error("Not allowed by CORS"));
+        return callback(null, true);
       }
+
+      console.log("❌ Origin bloqueado:", origin);
+      return callback(new Error("Not allowed by CORS"));
     },
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
     allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
 
-app.options("*", cors());
 app.use(express.json());
 
 // ---------------------- REGISTER ----------------------
