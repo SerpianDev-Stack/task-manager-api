@@ -38,6 +38,14 @@ app.use(
 
 app.use(express.json());
 
+app.get("/", (req, res) => {
+  // O código 200 (OK) confirma que o servidor está respondendo
+  res.status(200).json({ 
+    status: "API OK", 
+    message: "Servidor Task Manager rodando na Vercel." 
+  });
+});
+
 // ---------------------- REGISTER ----------------------
 app.post("/register", async (req, res) => {
   const { user_name, email, password } = req.body;
