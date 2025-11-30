@@ -1,7 +1,6 @@
 {
   "functions": {
     "api/index.ts": {
-      // CORREÇÃO: Use o nome correto do runtime Node.js
       "runtime": "nodejs20.x" 
     }
   },
