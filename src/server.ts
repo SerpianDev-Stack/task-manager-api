@@ -198,9 +198,4 @@ app.patch("/tasks/:task_id", async (req, res) => {
   }
 });
 
-// ---------------------- SERVER ----------------------
-const port = process.env.PORT || 8080;
-
-app.listen(port, () => {
-  console.log(`Servidor iniciado na porta ${port}`);
-});
+export default app;
