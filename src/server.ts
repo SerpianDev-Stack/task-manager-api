@@ -6,28 +6,37 @@ const prisma = new PrismaClient();
 const app = express();
 
 // ---------------------- CORS CONFIG ----------------------
-const allowedOrigins = process.env.CORS_ORIGINS
+const rawOrigins = process.env.CORS_ORIGINS
   ? process.env.CORS_ORIGINS.split(",")
   : ["http://localhost:5173"];
 
-const corsOptions = {
-  origin: (
-    origin: string | undefined,
-    callback: (error: Error | null, success?: boolean) => void
-  ) => {
-    // Permite requests sem origin (Postman) ou origins permitidas
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error("Origin not allowed by CORS"));
-    }
-  },
-  methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
-  credentials: true,
-};
+// remove espaços e barras finais
+const allowedOrigins = rawOrigins.map((o) =>
+  o.trim().replace(/\/$/, "")
+);
 
-app.use(cors(corsOptions));
-app.options("*", cors(corsOptions)); // <--- ESSENCIAL PARA PERMITIR O CORS
+console.log("🌎 Allowed Origins:", allowedOrigins);
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true); // Postman, Mobile, etc
+
+      const normalized = origin.replace(/\/$/, ""); // remove barra do origin real
+
+      if (allowedOrigins.includes(normalized)) {
+        callback(null, true);
+      } else {
+        console.log("❌ CORS bloqueado para:", origin);
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  })
+);
+
+app.options("*", cors());
 app.use(express.json());
 
 // ---------------------- REGISTER ----------------------
@@ -83,7 +92,7 @@ app.post("/login", async (req, res) => {
   }
 });
 
-// ---------------------- TASKS ----------------------
+// ---------------------- GET TASKS ----------------------
 app.get("/tasks/:user_id", async (req, res) => {
   try {
     const user_id = Number(req.params.user_id);
@@ -107,6 +116,7 @@ app.get("/tasks/:user_id", async (req, res) => {
   }
 });
 
+// ---------------------- CREATE TASK ----------------------
 app.post("/tasks/:user_id", async (req, res) => {
   const user_id = Number(req.params.user_id);
   const { task_name } = req.body;
@@ -130,6 +140,7 @@ app.post("/tasks/:user_id", async (req, res) => {
   }
 });
 
+// ---------------------- DELETE TASK ----------------------
 app.delete("/tasks/:task_id", async (req, res) => {
   const task_id = Number(req.params.task_id);
 
@@ -153,6 +164,7 @@ app.delete("/tasks/:task_id", async (req, res) => {
   }
 });
 
+// ---------------------- UPDATE TASK STATE ----------------------
 app.patch("/tasks/:task_id", async (req, res) => {
   const task_id = Number(req.params.task_id);
   const { state } = req.body;
