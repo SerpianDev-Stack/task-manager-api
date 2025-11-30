@@ -27,6 +27,7 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
+app.options("*", cors(corsOptions)); // <--- ESSENCIAL PARA PERMITIR O CORS
 app.use(express.json());
 
 // ---------------------- REGISTER ----------------------
