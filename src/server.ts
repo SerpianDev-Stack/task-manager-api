@@ -45,6 +45,7 @@ app.get("/", (req, res) => {
     status: "API OK",
     message: "Servidor Task Manager rodando.",
   });
+  console.log("Deu certo!");
 });
 
 // ---------------------- REGISTER ----------------------
@@ -208,13 +209,8 @@ app.patch("/tasks/:task_id", async (req, res) => {
   }
 });
 
-// ---------------------- EXPORTAÇÃO PARA VERCEL (MANDATÓRIO) ----------------------
-// ESSA LINHA É USADA EM PRODUÇÃO PELA VERCEL
 export default app;
 
-// ---------------------- EXECUÇÃO LOCAL (OPCIONAL/DEV) ----------------------
-// Esta lógica SÓ INICIA o servidor se não estiver no ambiente de produção.
-// Use http://localhost:3000/ para testar no Thunder Client
 if (process.env.NODE_ENV !== "production") {
   const PORT = process.env.PORT || 3000;
   app.listen(PORT, () => {
