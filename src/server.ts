@@ -2,18 +2,18 @@ import express from "express";
 import { PrismaClient } from "@prisma/client";
 import cors from "cors";
 
+// Inicializa o Prisma Client
 const prisma = new PrismaClient();
 const app = express();
 
 // ---------------------- CORS CONFIG ----------------------
+// Configura as origens permitidas (incluindo o front-end local)
 const rawOrigins = process.env.CORS_ORIGINS
   ? process.env.CORS_ORIGINS.split(",")
   : ["http://localhost:5173"];
 
-// remove espaços e barras finais
-const allowedOrigins = rawOrigins.map((o) =>
-  o.trim().replace(/\/$/, "")
-);
+// Remove espaços e barras finais
+const allowedOrigins = rawOrigins.map((o) => o.trim().replace(/\/$/, ""));
 
 console.log("🌎 Allowed Origins:", allowedOrigins);
 
@@ -38,11 +38,12 @@ app.use(
 
 app.use(express.json());
 
+// ---------------------- ROTA RAIZ (Health Check) ----------------------
+// Esta rota garante que a Vercel responda com 200 OK quando o domínio base é acessado (/)
 app.get("/", (req, res) => {
-  // O código 200 (OK) confirma que o servidor está respondendo
-  res.status(200).json({ 
-    status: "API OK", 
-    message: "Servidor Task Manager rodando na Vercel." 
+  res.status(200).json({
+    status: "API OK",
+    message: "Servidor Task Manager rodando.",
   });
 });
 
@@ -57,7 +58,7 @@ app.post("/register", async (req, res) => {
 
     if (existingUser) {
       return res.status(400).json({ message: "Email já cadastrado" });
-    }
+    } // Em uma aplicação real, aqui você usaria o bcrypt para hashear a senha. // Por simplicidade, estamos usando a senha em texto puro (não recomendado em produção!).
 
     await prisma.user.create({
       data: { user_name, email, password },
@@ -82,7 +83,7 @@ app.post("/login", async (req, res) => {
 
     if (!user || user.password !== password) {
       return res.status(401).json({ message: "Credenciais inválidas" });
-    }
+    } // Remove a senha do objeto de resposta
 
     const safeUser = {
       id: user.id,
@@ -113,7 +114,8 @@ app.get("/tasks/:user_id", async (req, res) => {
     }
 
     const tasks = await prisma.task.findMany({
-      where: { user_id },
+      where: { user_id }, // Sort tasks by id (or another field) in memory if needed,
+      // as orderBy() in Firestore can cause indexing errors.
     });
 
     return res.status(200).json(tasks);
@@ -206,4 +208,16 @@ app.patch("/tasks/:task_id", async (req, res) => {
   }
 });
 
+// ---------------------- EXPORTAÇÃO PARA VERCEL (MANDATÓRIO) ----------------------
+// ESSA LINHA É USADA EM PRODUÇÃO PELA VERCEL
 export default app;
+
+// ---------------------- EXECUÇÃO LOCAL (OPCIONAL/DEV) ----------------------
+// Esta lógica SÓ INICIA o servidor se não estiver no ambiente de produção.
+// Use http://localhost:3000/ para testar no Thunder Client
+if (process.env.NODE_ENV !== "production") {
+  const PORT = process.env.PORT || 3000;
+  app.listen(PORT, () => {
+    console.log(`🚀 Servidor rodando localmente na porta ${PORT}`);
+  });
+}
