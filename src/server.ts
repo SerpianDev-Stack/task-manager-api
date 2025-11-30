@@ -198,7 +198,7 @@ app.patch("/tasks/:task_id", async (req, res) => {
   }
 });
 
-const port = process.env.PORT || 3000; // Usa a porta do Railway, ou 3000 como fallback local
+const port = process.env.PORT || 8080; // Usa a porta do Railway, ou 3000 como fallback local
 
 app.listen(port, () => {
   console.log(`Servidor iniciado na porta ${port}`);
