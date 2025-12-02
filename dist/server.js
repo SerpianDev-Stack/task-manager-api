@@ -6,14 +6,42 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const client_1 = require("@prisma/client");
 const cors_1 = __importDefault(require("cors"));
+// Inicializa o Prisma Client
 const prisma = new client_1.PrismaClient();
 const app = (0, express_1.default)();
+// ---------------------- CORS CONFIG ----------------------
+// Configura as origens permitidas (incluindo o front-end local)
+const rawOrigins = process.env.CORS_ORIGINS
+    ? process.env.CORS_ORIGINS.split(",")
+    : ["http://localhost:5173"];
+// Remove espaços e barras finais
+const allowedOrigins = rawOrigins.map((o) => o.trim().replace(/\/$/, ""));
+console.log("🌎 Allowed Origins:", allowedOrigins);
 app.use((0, cors_1.default)({
-    origin: "http://localhost:5173", // origem permitida
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
-    credentials: true,
+    origin: (origin, callback) => {
+        if (!origin)
+            return callback(null, true);
+        const normalized = origin.replace(/\/$/, "");
+        if (allowedOrigins.includes(normalized)) {
+            return callback(null, true);
+        }
+        console.log("❌ Origin bloqueado:", origin);
+        return callback(new Error("Not allowed by CORS"));
+    },
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
+    allowedHeaders: ["Content-Type", "Authorization"],
 }));
 app.use(express_1.default.json());
+// ---------------------- ROTA RAIZ (Health Check) ----------------------
+// Esta rota garante que a Vercel responda com 200 OK quando o domínio base é acessado (/)
+app.get("/", (req, res) => {
+    res.status(200).json({
+        status: "API OK",
+        message: "Servidor Task Manager rodando.",
+    });
+    console.log("Deu certo!");
+});
+// ---------------------- REGISTER ----------------------
 app.post("/register", async (req, res) => {
     const { user_name, email, password } = req.body;
     try {
@@ -22,24 +50,18 @@ app.post("/register", async (req, res) => {
         });
         if (existingUser) {
             return res.status(400).json({ message: "Email já cadastrado" });
-        }
+        } // Em uma aplicação real, aqui você usaria o bcrypt para hashear a senha. // Por simplicidade, estamos usando a senha em texto puro (não recomendado em produção!).
         await prisma.user.create({
-            data: {
-                user_name,
-                email,
-                password,
-            },
+            data: { user_name, email, password },
         });
-        return res.status(201).json({
-            message: "Usuário criado com sucesso!",
-        });
+        return res.status(201).json({ message: "Usuário criado com sucesso!" });
     }
     catch (error) {
         console.log(error);
         return res.status(500).json({ message: "Erro interno no servidor" });
     }
 });
-// ------------------- LOGIN -------------------
+// ---------------------- LOGIN ----------------------
 app.post("/login", async (req, res) => {
     const { email, password } = req.body;
     try {
@@ -47,13 +69,9 @@ app.post("/login", async (req, res) => {
             where: { email },
             include: { tasks: true },
         });
-        if (!user) {
+        if (!user || user.password !== password) {
             return res.status(401).json({ message: "Credenciais inválidas" });
-        }
-        // comparação simples
-        if (user.password !== password) {
-            return res.status(401).json({ message: "Credenciais inválidas" });
-        }
+        } // Remove a senha do objeto de resposta
         const safeUser = {
             id: user.id,
             user_name: user.user_name,
@@ -68,7 +86,7 @@ app.post("/login", async (req, res) => {
         return res.status(500).json({ message: "Erro interno no servidor" });
     }
 });
-// ------------------- TASKS -------------------
+// ---------------------- GET TASKS ----------------------
 app.get("/tasks/:user_id", async (req, res) => {
     try {
         const user_id = Number(req.params.user_id);
@@ -79,7 +97,8 @@ app.get("/tasks/:user_id", async (req, res) => {
             return res.status(404).json({ message: "Usuário não encontrado" });
         }
         const tasks = await prisma.task.findMany({
-            where: { user_id },
+            where: { user_id }, // Sort tasks by id (or another field) in memory if needed,
+            // as orderBy() in Firestore can cause indexing errors.
         });
         return res.status(200).json(tasks);
     }
@@ -88,28 +107,28 @@ app.get("/tasks/:user_id", async (req, res) => {
         return res.status(500).json({ message: "Erro interno no servidor" });
     }
 });
+// ---------------------- CREATE TASK ----------------------
 app.post("/tasks/:user_id", async (req, res) => {
     const user_id = Number(req.params.user_id);
     const { task_name } = req.body;
+    if (!task_name || typeof task_name !== "string") {
+        return res.status(400).json({ message: "Nome da tarefa é obrigatório." });
+    }
     try {
         const task = await prisma.task.create({
-            data: {
-                task_name,
-                user_id,
-            },
+            data: { task_name, user_id },
         });
-        if (!task_name || typeof task_name !== "string") {
-            return res.status(400).json({ message: "Nome da tarefa é obrigatório." });
-        }
-        return res
-            .status(201)
-            .json({ message: "Tarefa criada com sucesso!", task });
+        return res.status(201).json({
+            message: "Tarefa criada com sucesso!",
+            task,
+        });
     }
     catch (error) {
         console.log(error);
         res.status(500).json({ message: "Erro interno no servidor" });
     }
 });
+// ---------------------- DELETE TASK ----------------------
 app.delete("/tasks/:task_id", async (req, res) => {
     const task_id = Number(req.params.task_id);
     try {
@@ -129,15 +148,16 @@ app.delete("/tasks/:task_id", async (req, res) => {
         return res.status(500).json({ error: "Erro interno no servidor" });
     }
 });
+// ---------------------- UPDATE TASK STATE ----------------------
 app.patch("/tasks/:task_id", async (req, res) => {
     const task_id = Number(req.params.task_id);
     const { state } = req.body;
+    if (state === undefined) {
+        return res
+            .status(400)
+            .json({ message: "O campo 'state' é obrigatório (true ou false)." });
+    }
     try {
-        if (state === undefined) {
-            return res.status(400).json({
-                message: "O campo 'state' é obrigatório (true ou false).",
-            });
-        }
         const taskExists = await prisma.task.findUnique({
             where: { id: task_id },
         });
@@ -158,9 +178,11 @@ app.patch("/tasks/:task_id", async (req, res) => {
         return res.status(500).json({ message: "Erro interno no servidor" });
     }
 });
-// ------------------- SERVER -------------------
-const port = 3000;
-app.listen(port, () => {
-    console.log(`Servidor iniciado na porta ${port}`);
-});
+exports.default = app;
+if (process.env.NODE_ENV !== "production") {
+    const PORT = process.env.PORT || 3000;
+    app.listen(PORT, () => {
+        console.log(`🚀 Servidor rodando localmente na porta ${PORT}`);
+    });
+}
 //# sourceMappingURL=server.js.map
