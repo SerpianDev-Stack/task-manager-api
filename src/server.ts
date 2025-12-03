@@ -2,17 +2,13 @@ import express from "express";
 import { PrismaClient } from "@prisma/client";
 import cors from "cors";
 
-// Inicializa o Prisma Client
 const prisma = new PrismaClient();
 const app = express();
 
-// ---------------------- CORS CONFIG ----------------------
-// Configura as origens permitidas (incluindo o front-end local)
 const rawOrigins = process.env.CORS_ORIGINS
   ? process.env.CORS_ORIGINS.split(",")
   : ["http://localhost:5173"];
 
-// Remove espaços e barras finais
 const allowedOrigins = rawOrigins.map((o) => o.trim().replace(/\/$/, ""));
 
 console.log("🌎 Allowed Origins:", allowedOrigins);
@@ -31,15 +27,25 @@ app.use(
       console.log("❌ Origin bloqueado:", origin);
       return callback(new Error("Not allowed by CORS"));
     },
-    methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
+    preflightContinue: false,
+    optionsSuccessStatus: 200,
   })
 );
 
 app.use(express.json());
 
-// ---------------------- ROTA RAIZ (Health Check) ----------------------
-// Esta rota garante que a Vercel responda com 200 OK quando o domínio base é acessado (/)
+app.options("*", (req, res) => {
+  res.header("Access-Control-Allow-Origin", req.headers.origin || "*");
+  res.header(
+    "Access-Control-Allow-Methods",
+    "GET,POST,PUT,PATCH,DELETE,OPTIONS"
+  );
+  res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.sendStatus(200);
+});
+
 app.get("/", (req, res) => {
   res.status(200).json({
     status: "API OK",
@@ -48,7 +54,6 @@ app.get("/", (req, res) => {
   console.log("Deu certo!");
 });
 
-// ---------------------- REGISTER ----------------------
 app.post("/register", async (req, res) => {
   const { user_name, email, password } = req.body;
 
@@ -59,7 +64,7 @@ app.post("/register", async (req, res) => {
 
     if (existingUser) {
       return res.status(400).json({ message: "Email já cadastrado" });
-    } // Em uma aplicação real, aqui você usaria o bcrypt para hashear a senha. // Por simplicidade, estamos usando a senha em texto puro (não recomendado em produção!).
+    }
 
     await prisma.user.create({
       data: { user_name, email, password },
@@ -72,7 +77,6 @@ app.post("/register", async (req, res) => {
   }
 });
 
-// ---------------------- LOGIN ----------------------
 app.post("/login", async (req, res) => {
   const { email, password } = req.body;
 
@@ -84,7 +88,7 @@ app.post("/login", async (req, res) => {
 
     if (!user || user.password !== password) {
       return res.status(401).json({ message: "Credenciais inválidas" });
-    } // Remove a senha do objeto de resposta
+    }
 
     const safeUser = {
       id: user.id,
@@ -101,7 +105,6 @@ app.post("/login", async (req, res) => {
   }
 });
 
-// ---------------------- GET TASKS ----------------------
 app.get("/tasks/:user_id", async (req, res) => {
   try {
     const user_id = Number(req.params.user_id);
@@ -115,8 +118,7 @@ app.get("/tasks/:user_id", async (req, res) => {
     }
 
     const tasks = await prisma.task.findMany({
-      where: { user_id }, // Sort tasks by id (or another field) in memory if needed,
-      // as orderBy() in Firestore can cause indexing errors.
+      where: { user_id },
     });
 
     return res.status(200).json(tasks);
@@ -126,7 +128,6 @@ app.get("/tasks/:user_id", async (req, res) => {
   }
 });
 
-// ---------------------- CREATE TASK ----------------------
 app.post("/tasks/:user_id", async (req, res) => {
   const user_id = Number(req.params.user_id);
   const { task_name } = req.body;
@@ -150,7 +151,6 @@ app.post("/tasks/:user_id", async (req, res) => {
   }
 });
 
-// ---------------------- DELETE TASK ----------------------
 app.delete("/tasks/:task_id", async (req, res) => {
   const task_id = Number(req.params.task_id);
 
@@ -174,7 +174,6 @@ app.delete("/tasks/:task_id", async (req, res) => {
   }
 });
 
-// ---------------------- UPDATE TASK STATE ----------------------
 app.patch("/tasks/:task_id", async (req, res) => {
   const task_id = Number(req.params.task_id);
   const { state } = req.body;
